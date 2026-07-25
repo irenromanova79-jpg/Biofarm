@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IRIX NORMA — нормативная себестоимость</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Geologica:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0A0F0D; --bg2:#0D1B16; --bg3:#151A19; --bg4:#1E2724;
+  --border:#243029; --text:#F2F2F2; --text2:#8A9691; --text3:#4E5A55;
+  --accent:#00E38A; --accent2:#00B874;
+  --green:#00E38A; --green-bg:rgba(0,227,138,.1);
+  --red:#ef4444;   --red-bg:rgba(239,68,68,.1);
+  --amber:#f59e0b; --amber-bg:rgba(245,158,11,.1);
+  --blue:#38bdf8;  --blue-bg:rgba(56,189,248,.1);
+  --font:'Geologica',sans-serif; --mono:'JetBrains Mono',monospace;
+  --r:6px; --r2:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-weight:300;font-size:14px;display:flex;min-height:100vh}
+button,input,select{font-family:inherit;font-size:inherit;color:inherit}
+a{color:var(--accent)}
+
+/* ── навигация ─────────────────────────────────────────── */
+.side{width:246px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{padding:1.1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.6rem}
+.mark{width:30px;height:30px;flex-shrink:0;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#06251A;font-weight:600;font-size:15px;font-family:var(--mono)}
+.brand-t{font-family:var(--mono);font-weight:500;letter-spacing:.09em;font-size:14px}
+.brand-s{font-size:9px;color:var(--text3);letter-spacing:.16em;text-transform:uppercase;margin-top:1px}
+.navgroup{padding:.9rem 1.25rem .3rem;font-size:9.5px;letter-spacing:.17em;color:var(--text3);text-transform:uppercase}
+.nav{display:flex;align-items:center;gap:.65rem;padding:.6rem 1.25rem;cursor:pointer;color:var(--text2);border-left:2px solid transparent;transition:.13s}
+.nav:hover{background:var(--bg3);color:var(--text)}
+.nav.on{background:var(--green-bg);color:var(--accent);border-left-color:var(--accent)}
+.nav .ic{width:17px;text-align:center;font-size:13px;opacity:.85}
+.nav .cnt{margin-left:auto;font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:20px;background:var(--bg4);color:var(--text2)}
+.nav .cnt.warn{background:var(--amber-bg);color:var(--amber)}
+.side-foot{margin-top:auto;padding:1rem 1.25rem;font-size:9px;color:var(--text3);letter-spacing:.14em;font-family:var(--mono)}
+
+/* ── каркас ────────────────────────────────────────────── */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:20;background:rgba(10,15,13,.93);backdrop-filter:blur(9px);border-bottom:1px solid var(--border);padding:.85rem 1.6rem;display:flex;align-items:center;gap:1rem}
+.top h1{font-size:13px;font-weight:400;font-family:var(--mono);color:var(--text2)}
+.top h1 b{color:var(--accent);font-weight:500}
+.ver{font-size:10px;color:var(--text3);font-family:var(--mono)}
+.top-r{margin-left:auto;display:flex;gap:.5rem;align-items:center}
+.page{padding:1.4rem 1.6rem 3rem;display:none}
+.page.on{display:block}
+
+/* ── элементы ──────────────────────────────────────────── */
+.btn{background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:.45rem .85rem;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;font-size:12.5px;transition:.13s;white-space:nowrap}
+.btn:hover{border-color:var(--accent2);color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#06251A;font-weight:500}
+.btn.pri:hover{background:var(--accent2);border-color:var(--accent2);color:#06251A}
+.btn.sm{padding:.25rem .55rem;font-size:11px}
+.btn.ghost{background:none}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.25rem;margin-bottom:1rem}
+.card h2{font-size:13px;font-weight:500;margin-bottom:.15rem;display:flex;align-items:center;gap:.5rem}
+.card p.sub{font-size:11.5px;color:var(--text2);line-height:1.5}
+.grid{display:grid;gap:1rem}
+.hint{font-size:11.5px;color:var(--text2);line-height:1.55}
+.tag{font-family:var(--mono);font-size:9.5px;padding:1.5px 6px;border-radius:20px;background:var(--bg4);color:var(--text2);white-space:nowrap}
+.tag.g{background:var(--green-bg);color:var(--green)}
+.tag.a{background:var(--amber-bg);color:var(--amber)}
+.tag.r{background:var(--red-bg);color:var(--red)}
+.tag.b{background:var(--blue-bg);color:var(--blue)}
+
+/* ── загрузка файлов ───────────────────────────────────── */
+.drop{border:1px dashed var(--border);border-radius:var(--r2);padding:1.4rem 1.1rem;text-align:center;cursor:pointer;transition:.15s;background:var(--bg2)}
+.drop:hover,.drop.over{border-color:var(--accent2);background:var(--bg3)}
+.drop.ok{border-style:solid;border-color:var(--accent2)}
+.drop .t{font-weight:500;font-size:13px;margin-bottom:.2rem}
+.drop .d{font-size:11px;color:var(--text2);line-height:1.5}
+.state{margin-top:.7rem;font-family:var(--mono);font-size:11px;padding:.4rem .55rem;border-radius:var(--r);background:var(--bg4);color:var(--text2);word-break:break-word}
+.state.ok{background:var(--green-bg);color:var(--green)}
+.state.err{background:var(--red-bg);color:var(--red);text-align:left}
+.state.busy{background:var(--blue-bg);color:var(--blue)}
+
+/* ── метрики ───────────────────────────────────────────── */
+.mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:.8rem;margin-bottom:1.1rem}
+.met{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:.85rem 1rem}
+.met .l{font-size:9.5px;letter-spacing:.14em;color:var(--text3);text-transform:uppercase}
+.met .v{font-size:26px;font-weight:300;font-family:var(--mono);margin-top:.25rem;line-height:1.1}
+.met .s{font-size:10.5px;color:var(--text2);font-family:var(--mono);margin-top:.15rem}
+.met .v.g{color:var(--green)} .met .v.r{color:var(--red)} .met .v.a{color:var(--amber)}
+
+/* ── таблицы ───────────────────────────────────────────── */
+.tw{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:auto;max-height:74vh}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{position:sticky;top:0;z-index:2;background:var(--bg3);text-align:left;padding:.6rem .7rem;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:.5rem .7rem;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+.r{text-align:right;font-family:var(--mono);white-space:nowrap}
+.mono{font-family:var(--mono)}
+.dim{color:var(--text2)}
+.dim2{color:var(--text3)}
+.g{color:var(--green)} .rd{color:var(--red)} .am{color:var(--amber)}
+.empty{padding:2.2rem;text-align:center;color:var(--text3);font-size:12.5px}
+.bar{height:3px;border-radius:2px;background:var(--bg4);overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;background:var(--accent)}
+
+/* ── дерево ────────────────────────────────────────────── */
+.node{display:flex;align-items:baseline;gap:.45rem;font-size:12.5px}
+.pipe{color:var(--text3);font-family:var(--mono);white-space:pre}
+.kind{font-family:var(--mono);font-size:9px;padding:0 5px;border-radius:3px;background:var(--bg4);color:var(--text3)}
+input.cell{background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:.2rem .4rem;width:96px;text-align:right;font-family:var(--mono);font-size:11.5px}
+input.cell:focus{outline:none;border-color:var(--accent2)}
+input.search{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.45rem .7rem;width:280px;font-size:12.5px}
+input.search:focus{outline:none;border-color:var(--accent2)}
+select.sel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:.45rem .6rem;font-size:12.5px}
+.toolbar{display:flex;gap:.6rem;align-items:center;margin-bottom:.9rem;flex-wrap:wrap}
+.sugg{display:flex;flex-direction:column;gap:.3rem}
+.sugg button{text-align:left;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:.35rem .55rem;cursor:pointer;font-size:11.5px;transition:.13s}
+.sugg button:hover{border-color:var(--accent2);color:var(--accent)}
+.sugg .pct{font-family:var(--mono);font-size:10px;color:var(--text3);margin-right:.4rem}
+.toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);background:var(--bg4);border:1px solid var(--accent2);color:var(--accent);padding:.6rem 1rem;border-radius:var(--r);font-size:12.5px;z-index:99;opacity:0;transition:.25s;pointer-events:none}
+.toast.on{opacity:1}
+@media(max-width:900px){.side{width:60px}.brand-t,.brand-s,.nav span.lbl,.navgroup,.side-foot{display:none}}
+@media print{.side,.top-r,.toolbar{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="brand">
+    <div class="mark">N</div>
+    <div>
+      <div class="brand-t">IRIX NORMA</div>
+      <div class="brand-s">smart apps by Irina Romanova</div>
+    </div>
+  </div>
+  <div class="navgroup">Данные</div>
+  <div class="nav on" data-p="load"><span class="ic">↑</span><span class="lbl">Загрузка</span></div>
+  <div class="nav" data-p="match"><span class="ic">≈</span><span class="lbl">Сопоставление</span><span class="cnt" id="c-match">0</span></div>
+  <div class="nav" data-p="prices"><span class="ic">₽</span><span class="lbl">Цены сырья</span><span class="cnt" id="c-prices">0</span></div>
+  <div class="navgroup">Расчёт</div>
+  <div class="nav" data-p="calc"><span class="ic">≡</span><span class="lbl">Калькуляция</span></div>
+  <div class="nav" data-p="tree"><span class="ic">⊞</span><span class="lbl">Состав изделия</span></div>
+  <div class="nav" data-p="buyers"><span class="ic">◫</span><span class="lbl">Покупатели</span></div>
+  <div class="nav" data-p="report"><span class="ic">◈</span><span class="lbl">Отчёт</span></div>
+  <div class="side-foot">рецептура · цены · норматив</div>
+</aside>
+
+<div class="main">
+  <header class="top">
+    <h1>Нормативная себестоимость <b>v1.0</b> <span class="ver" id="build"></span></h1>
+    <div class="top-r">
+      <span class="mono" id="ready-note" style="font-size:11px;color:var(--text3)"></span>
+      <button class="btn pri" id="btn-calc" onclick="runCalc()" disabled>▶ Рассчитать</button>
+      <button class="btn ghost" onclick="window.print()">Печать</button>
+    </div>
+  </header>
+
+  <!-- ══ ЗАГРУЗКА ══ -->
+  <section class="page on" id="p-load">
+    <div class="card">
+      <h2>Резервная копия</h2>
+      <p class="sub">Цены, введённые руками, сопоставления названий и справочник услуг хранятся в этом браузере. Перед переустановкой или чисткой кеша выгрузите копию — восстановление одним файлом.</p>
+      <div style="display:flex;gap:.5rem;margin-top:.75rem">
+        <button class="btn" onclick="backupSave()">Сохранить всё в файл</button>
+        <button class="btn" onclick="document.getElementById('f-backup').click()">Восстановить из файла</button>
+        <input type="file" id="f-backup" accept=".json" hidden onchange="backupLoad(this)">
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(270px,1fr))">
+      <div>
+        <div class="drop" id="d-specs" onclick="document.getElementById('f-specs').click()">
+          <div class="t">Спецификации</div>
+          <div class="d">Универсальный отчёт<br>«Спецификации по умолчанию»</div>
+        </div>
+        <input type="file" id="f-specs" accept=".xlsx,.xls" hidden onchange="loadSpecs(this)">
+        <div class="state" id="s-specs">не загружено</div>
+      </div>
+      <div>
+        <div class="drop" id="d-prices" onclick="document.getElementById('f-prices').click()">
+          <div class="t">Цены закупок</div>
+          <div class="d">Анализ закупок<br>Номенклатура + Цена</div>
+        </div>
+        <input type="file" id="f-prices" accept=".xlsx,.xls" hidden onchange="loadPrices(this)">
+        <div class="state" id="s-prices">не загружено</div>
+      </div>
+      <div>
+        <div class="drop" id="d-sales" onclick="document.getElementById('f-sales').click()">
+          <div class="t">Продажи</div>
+          <div class="d">Реализация с разбивкой<br>по покупателям</div>
+        </div>
+        <input type="file" id="f-sales" accept=".xlsx,.xls" hidden onchange="loadSales(this)">
+        <div class="state" id="s-sales">не загружено</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem">
+      <h2>Что происходит после загрузки</h2>
+      <p class="sub">
+        Спецификация разворачивается до сырья: полуфабрикат внутри изделия раскрывается своей рецептурой, и так до самого низа.
+        Цена берётся из закупок, а если её там нет — из того, что вы ввели руками.
+        Позиции, у которых цену найти не удалось, не превращаются в ноль: они помечаются, и расчёт честно показывает, что он неполный.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ СОПОСТАВЛЕНИЕ ══ -->
+  <section class="page" id="p-match">
+    <div class="card">
+      <h2>Сопоставление названий</h2>
+      <p class="sub">В продажах и спецификациях одна и та же позиция часто названа по-разному: «Joyer premium "5-НТР"…» против «СТМ "5-НТР" (ТЖК)». Свяжите их один раз — связка запомнится и будет применяться при каждом расчёте. Позиции, которых у вас нет в производстве (услуги, доработки), отметьте как непроизводимые, и они перестанут числиться в ошибках.</p>
+    </div>
+    <div class="toolbar">
+      <input class="search" id="m-search" placeholder="Поиск по названию..." oninput="renderMatch()">
+      <select class="sel" id="m-filter" onchange="renderMatch()">
+        <option value="open">Требуют внимания</option>
+        <option value="linked">Связанные вручную</option>
+        <option value="service">Непроизводимые</option>
+        <option value="all">Все позиции продаж</option>
+      </select>
+      <span class="hint" id="m-note"></span>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Позиция из продаж</th><th style="width:44%">Спецификация</th><th class="r">Кол-во</th><th class="r">Выручка</th><th></th></tr></thead>
+      <tbody id="m-body"></tbody>
+    </table></div>
+  </section>
+
+  <!-- ══ ЦЕНЫ ══ -->
+  <section class="page" id="p-prices">
+    <div class="toolbar">
+      <input class="search" id="pr-search" placeholder="Поиск по сырью..." oninput="renderPrices()">
+      <select class="sel" id="pr-filter" onchange="renderPrices()">
+        <option value="none">Без цены</option>
+        <option value="all">Всё сырьё</option>
+        <option value="manual">Введённые руками</option>
+      </select>
+      <button class="btn" onclick="exportPrices()">Выгрузить для заполнения</button>
+      <button class="btn" onclick="document.getElementById('f-prfill').click()">Загрузить заполненное</button>
+      <input type="file" id="f-prfill" accept=".xlsx,.xls" hidden onchange="importPrices(this)">
+      <span class="hint" id="pr-note"></span>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Сырьё и материалы</th><th>Ед.</th><th class="r">В изделиях</th><th class="r">Цена закупки</th><th class="r">Своя цена</th><th>Источник</th></tr></thead>
+      <tbody id="pr-body"></tbody>
+    </table></div>
+  </section>
+
+  <!-- ══ КАЛЬКУЛЯЦИЯ ══ -->
+  <section class="page" id="p-calc">
+    <div class="mets" id="calc-mets"></div>
+    <div class="toolbar">
+      <input class="search" id="c-search" placeholder="Поиск позиции..." oninput="renderCalc()">
+      <select class="sel" id="c-filter" onchange="renderCalc()">
+        <option value="sold">Только продававшиеся</option>
+        <option value="all">Все изделия из спецификаций</option>
+        <option value="bad">Неполные и без спецификации</option>
+        <option value="loss">Убыточные</option>
+      </select>
+      <button class="btn" onclick="exportCalc()">Выгрузить в xlsx</button>
+      <span class="hint" id="c-note"></span>
+    </div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Позиция</th><th class="r">Кол-во</th><th class="r">Выручка</th>
+        <th class="r">Себест/ед</th><th class="r">Себест итого</th>
+        <th class="r">Маржа</th><th class="r">Маржа %</th><th>Статус</th><th></th>
+      </tr></thead>
+      <tbody id="c-body"></tbody>
+    </table></div>
+  </section>
+
+  <!-- ══ ДЕРЕВО ══ -->
+  <section class="page" id="p-tree">
+    <div class="toolbar">
+      <select class="sel" id="t-pick" onchange="renderTree()" style="min-width:420px"></select>
+      <span class="hint" id="t-note"></span>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Состав</th><th>Ед.</th><th class="r">Норма</th><th class="r">Цена</th><th class="r">Сумма</th><th class="r">Доля</th><th>Источник</th></tr></thead>
+      <tbody id="t-body"></tbody>
+    </table></div>
+  </section>
+
+  <!-- ══ ПОКУПАТЕЛИ ══ -->
+  <section class="page" id="p-buyers">
+    <div class="mets" id="b-mets"></div>
+    <div class="toolbar">
+      <button class="btn" onclick="exportBuyers()">Выгрузить в xlsx</button>
+      <span class="hint">Себестоимость подставляется из расчёта по спецификациям.</span>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Покупатель</th><th class="r">Позиций</th><th class="r">Кол-во</th><th class="r">Выручка</th><th class="r">Себестоимость</th><th class="r">Маржа</th><th class="r">Маржа %</th><th class="r">Доля выручки</th></tr></thead>
+      <tbody id="b-body"></tbody>
+    </table></div>
+    <div class="card" style="margin-top:1rem">
+      <h2>Детализация по покупателям</h2>
+      <div class="tw" style="max-height:52vh;margin-top:.7rem"><table>
+        <thead><tr><th>Покупатель</th><th>Позиция</th><th class="r">Кол-во</th><th class="r">Выручка</th><th class="r">Себестоимость</th><th class="r">Маржа %</th></tr></thead>
+        <tbody id="bd-body"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ══ ОТЧЁТ ══ -->
+  <section class="page" id="p-report">
+    <div id="rep-body"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const BUILD = 'build 2026-07-25';
+document.getElementById('build').textContent = BUILD;
+
+/* ═══════════════════════════════════════════════════════════
+   СОСТОЯНИЕ
+   ═══════════════════════════════════════════════════════════ */
+const S = {
+  specs: {},        // ключ -> {nom, variants:[{kind, comps:[{name,unit,qty}]}]}
+  pick: {},         // ключ -> номер выбранного варианта спецификации
+  yield: {},        // ключ -> выход партии полуфабриката, если задан руками
+  specIndex: null,  // ключ -> ключ (для быстрого поиска)
+  purchase: {},     // ключ -> цена из закупок
+  manual: {},       // ключ -> цена, введённая руками
+  units: {},        // ключ -> единица измерения
+  sales: [],        // [{nom, unit, qty, rev, buyers:[{name,qty,rev}]}]
+  aliases: {},      // ключ продажи -> ключ спецификации
+  services: {},     // ключ продажи -> true (не производится)
+  calc: [],
+  files: { specs:'', prices:'', sales:'' }
+};
+const MAXDEPTH = 8;
+
+/* ═══════════════════════════════════════════════════════════
+   ХРАНИЛИЩЕ
+   ═══════════════════════════════════════════════════════════ */
+const LS = {
+  ok: (() => { try { localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; } catch(e){ return false; } })(),
+  get(k, def) { if (!this.ok) return def; try { const v = localStorage.getItem('norma:'+k); return v ? JSON.parse(v) : def; } catch(e){ return def; } },
+  set(k, v) {
+    if (!this.ok) return false;
+    try { localStorage.setItem('norma:'+k, JSON.stringify(v)); return true; }
+    catch(e) { toast('Хранилище переполнено. Выгрузите резервную копию и очистите кеш.'); return false; }
+  }
+};
+function saveUser() { LS.set('manual', S.manual); LS.set('aliases', S.aliases); LS.set('services', S.services); LS.set('pick', S.pick); LS.set('yield', S.yield); }
+function loadUser() {
+  S.manual   = LS.get('manual', {});
+  S.aliases  = LS.get('aliases', {});
+  S.services = LS.get('services', {});
+  S.pick     = LS.get('pick', {});
+  S.yield    = LS.get('yield', {});
+}
+
+/* ═══════════════════════════════════════════════════════════
+   НОРМАЛИЗАЦИЯ
+   Ключ только для сопоставления. Исходное написание хранится
+   отдельно и идёт в интерфейс и в выгрузки.
+   ═══════════════════════════════════════════════════════════ */
+const HOMO = {a:'а',b:'в',c:'с',e:'е',h:'н',k:'к',m:'м',o:'о',p:'р',t:'т',x:'х',y:'у'};
+function norm(v) {
+  let s = String(v == null ? '' : v).toLowerCase();
+  s = s.replace(/[\u00a0\u202f\u2007]/g, ' ');          // неразрывные пробелы
+  s = s.replace(/[«»""„"'`]/g, '"');                     // кавычки всех видов
+  s = s.replace(/[–—]/g, '-');                            // тире
+  s = s.replace(/\s+/g, ' ').trim();
+  return s.replace(/[abcehkmoptxy]/g, c => HOMO[c] || c); // латиница-двойники
+}
+const txt = v => String(v == null ? '' : v).trim().replace(/^nan$/i, '');
+function num(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  const s = String(v == null ? '' : v).replace(/[\s\u00a0]/g, '').replace(',', '.');
+  if (!s) return null;
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+const fmt  = n => (Math.round(n) || 0).toLocaleString('ru-RU');
+const fmt2 = n => (n || 0).toLocaleString('ru-RU', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtM = n => Math.abs(n) >= 1e6 ? (n/1e6).toFixed(1)+' млн' : fmt(n);
+function toast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m; t.classList.add('on');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 2600);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЧТЕНИЕ XLSX
+   Второй аргумент — служебные данные листа. Объединённые
+   ячейки нужны, чтобы отличать строки-группировки 1С.
+   ═══════════════════════════════════════════════════════════ */
+function readXlsx(file, cb, onError) {
+  const fail = m => { console.error('readXlsx:', m); onError ? onError(m) : toast('Не удалось прочитать файл: ' + m); };
+  if (typeof XLSX === 'undefined') { fail('библиотека чтения xlsx не загрузилась — проверьте интернет'); return; }
+  const r = new FileReader();
+  r.onerror = () => fail('ошибка чтения файла');
+  r.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) { fail('в файле нет ни одного листа'); return; }
+      cb(XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: true }), { merges: ws['!merges'] || [] });
+    } catch (err) { fail(err && err.message ? err.message : String(err)); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+/* Плотная строка: SheetJS отдаёт массив с дырами на месте пустых
+   ячеек, и перебор по ним падает на undefined. */
+const dense = row => Array.from(row || [], x => x);
+const normRow = row => Array.from(row || [], x => norm(x));
+
+/* Шапка бывает двухстрочной, часть заголовков объединена по
+   вертикали и попадает только в верхнюю строку. Склеиваем. */
+function headerAt(rows, i) {
+  const a = dense(rows[i]), b = i > 0 ? dense(rows[i-1]) : [];
+  const H = [];
+  for (let c = 0; c < Math.max(a.length, b.length); c++) {
+    const x = norm(a[c]), y = norm(b[c]);
+    H.push(x && y ? x + ' ' + y : (x || y));
+  }
+  return H;
+}
+function findHeader(rows, words, limit) {
+  for (let i = 0; i < Math.min(rows.length, limit || 20); i++) {
+    const j = normRow(rows[i]).join(' | ');
+    if (words.some(w => j.includes(w))) return i;
+  }
+  return -1;
+}
+function colOf(H, ...words) { return H.findIndex(s => s && words.some(w => s.includes(w))); }
+
+function setState(id, cls, html) {
+  const el = document.getElementById(id);
+  el.className = 'state ' + cls;
+  el.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЗАГРУЗКА: СПЕЦИФИКАЦИИ
+   Изделие и компонент лежат в одной колонке. Отличаем по тому,
+   что у компонента заполнено количество, а у изделия вместо
+   единицы стоит вид спецификации (СГР, ПП и т.п.).
+   ═══════════════════════════════════════════════════════════ */
+function loadSpecs(inp) {
+  const f = inp.files[0]; if (!f) return;
+  setState('s-specs','busy','читаем...');
+  readXlsx(f, (rows) => {
+    try {
+      const t0 = performance.now();
+      let hdr = findHeader(rows, ['состав.номенклатура','состав. номенклатура'], 25);
+      let H, iName, iQty, iUnit;
+      if (hdr >= 0) {
+        H = headerAt(rows, hdr);
+        iName = colOf(H, 'состав.номенклатура');
+        iQty  = colOf(H, 'состав.количество');
+        iUnit = colOf(H, 'состав.ед');
+      } else {
+        hdr = findHeader(rows, ['номенклатура'], 25);
+        if (hdr < 0) { setState('s-specs','err','⚠ не нашли шапку: нужен столбец «Спецификация.Состав.Номенклатура»'); return; }
+        H = headerAt(rows, hdr);
+        iName = colOf(H, 'номенклат');
+        iQty  = colOf(H, 'количест');
+        iUnit = colOf(H, 'ед.','ед изм','единиц');
+      }
+      if (iName < 0 || iQty < 0) { setState('s-specs','err','⚠ в шапке нет колонок с номенклатурой и количеством'); return; }
+
+      S.specs = {}; S.units = {}; S.specIndex = null;
+      let cur = null, comps = 0, kinds = {};
+      for (let i = hdr + 1; i < rows.length; i++) {
+        const r = dense(rows[i]); if (!r.length) continue;
+        const name = txt(r[iName]);
+        if (!name) continue;
+        if (/^(итого|всего)/i.test(name)) continue;
+        const q = num(r[iQty]);
+        const u = iUnit >= 0 ? txt(r[iUnit]) : '';
+        if (q !== null) {
+          if (!cur) continue;                       // компонент до первого изделия
+          cur.comps.push({ name, unit: u, qty: q });
+          if (u) S.units[norm(name)] = u;
+          comps++;
+        } else {
+          // Одна номенклатура может иметь несколько спецификаций (разные вкусы,
+          // фасовки, редакции СГР). Складывать их вместе нельзя — храним вариантами.
+          const k = norm(name);
+          if (!S.specs[k]) S.specs[k] = { nom: name, variants: [] };
+          cur = { kind: u || ('вариант ' + (S.specs[k].variants.length + 1)), comps: [] };
+          S.specs[k].variants.push(cur);
+          kinds[u || '—'] = (kinds[u || '—'] || 0) + 1;
+        }
+      }
+      const n = Object.keys(S.specs).length;
+      const vars = Object.values(S.specs).reduce((a, s) => a + s.variants.length, 0);
+      const multi = Object.values(S.specs).filter(s => s.variants.length > 1).length;
+      const empty = Object.values(S.specs).filter(s => s.variants.every(v => !v.comps.length)).length;
+      S.files.specs = f.name;
+      console.log('Спецификации:', Math.round(performance.now()-t0)+' мс', '| шапка в строке', hdr+1,
+                  '| колонки', {iName,iQty,iUnit}, '→', n, 'спецификаций,', comps, 'компонентов', kinds);
+      if (!comps) { setState('s-specs','err','⚠ прочитано 0 компонентов — разбор не удался, проверьте выгрузку'); return; }
+      document.getElementById('d-specs').classList.add('ok');
+      setState('s-specs','ok', `${f.name}<br>${n} номенклатур · ${vars} спецификаций · ${comps} компонентов`
+        + (multi ? `<br><span class="am">у ${multi} позиций несколько вариантов — выбор на вкладке «Состав изделия»</span>` : '')
+        + (empty ? ` · <span class="am">${empty} пустых</span>` : ''));
+      afterLoad();
+    } catch (err) {
+      console.error('loadSpecs:', err);
+      setState('s-specs','err','⚠ ошибка разбора: ' + (err.message || err));
+    }
+  }, m => setState('s-specs','err','⚠ ' + m));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЗАГРУЗКА: ЦЕНЫ ЗАКУПОК
+   ═══════════════════════════════════════════════════════════ */
+function loadPrices(inp) {
+  const f = inp.files[0]; if (!f) return;
+  setState('s-prices','busy','читаем...');
+  readXlsx(f, (rows) => {
+    try {
+      const hdr = findHeader(rows, ['номенклат','наименован'], 20);
+      if (hdr < 0) { setState('s-prices','err','⚠ не нашли шапку с колонкой «Номенклатура»'); return; }
+      const H = headerAt(rows, hdr);
+      const iName = colOf(H, 'номенклат','наименован');
+      let iPrice  = colOf(H, 'цена','стоимост');
+      if (iPrice < 0) iPrice = colOf(H, 'сумма');
+      const iUnit = colOf(H, 'ед.','ед изм','единиц');
+      if (iName < 0 || iPrice < 0) { setState('s-prices','err','⚠ в шапке нет колонок с номенклатурой и ценой'); return; }
+
+      S.purchase = {};
+      let n = 0, zero = 0;
+      for (let i = hdr + 1; i < rows.length; i++) {
+        const r = dense(rows[i]); if (!r.length) continue;
+        const name = txt(r[iName]); if (!name) continue;
+        if (/^(итого|всего)/i.test(name)) continue;
+        const p = num(r[iPrice]);
+        if (p === null) continue;
+        if (p <= 0) { zero++; continue; }
+        S.purchase[norm(name)] = p;
+        if (iUnit >= 0 && txt(r[iUnit])) S.units[norm(name)] = txt(r[iUnit]);
+        n++;
+      }
+      S.files.prices = f.name;
+      console.log('Цены закупок:', n, 'позиций | шапка в строке', hdr+1, '| колонки', {iName,iPrice});
+      if (!n) { setState('s-prices','err','⚠ не прочитано ни одной цены'); return; }
+      document.getElementById('d-prices').classList.add('ok');
+      setState('s-prices','ok', `${f.name}<br>${n} цен` + (zero ? ` · ${zero} нулевых пропущено` : ''));
+      afterLoad();
+    } catch (err) {
+      console.error('loadPrices:', err);
+      setState('s-prices','err','⚠ ошибка разбора: ' + (err.message || err));
+    }
+  }, m => setState('s-prices','err','⚠ ' + m));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЗАГРУЗКА: ПРОДАЖИ
+   Под каждой позицией идут строки покупателей: у них объединены
+   ячейки и не заполнена единица измерения.
+   ═══════════════════════════════════════════════════════════ */
+function loadSales(inp) {
+  const f = inp.files[0]; if (!f) return;
+  setState('s-sales','busy','читаем...');
+  readXlsx(f, (rows, meta) => {
+    try {
+      const hdr = findHeader(rows, ['номенклат','наименован'], 20);
+      if (hdr < 0) { setState('s-sales','err','⚠ не нашли шапку с колонкой «Номенклатура»'); return; }
+      const H = headerAt(rows, hdr);
+      const iName = colOf(H, 'номенклат','наименован');
+      const iUnit = colOf(H, 'ед.','ед изм','единиц');
+      const iQty  = colOf(H, 'количест','кол-во');
+      const iRev  = colOf(H, 'выручк','сумма','продаж');
+      if (iName < 0 || (iQty < 0 && iRev < 0)) { setState('s-sales','err','⚠ в шапке нет количества и выручки'); return; }
+
+      // строки-покупатели: объединённые ячейки поверх номенклатуры
+      const merged = new Set();
+      (meta.merges || []).forEach(m => {
+        if (m.s.r === m.e.r && m.s.c <= iName && m.e.c > iName) merged.add(m.s.r);
+      });
+
+      S.sales = [];
+      let cur = null, buyers = 0;
+      for (let i = hdr + 1; i < rows.length; i++) {
+        const r = dense(rows[i]); if (!r.length) continue;
+        const name = txt(r[iName]); if (!name) continue;
+        if (/^(итого|всего)/i.test(name)) continue;
+        const qty = iQty >= 0 ? (num(r[iQty]) || 0) : 0;
+        const rev = iRev >= 0 ? (num(r[iRev]) || 0) : 0;
+        const unit = iUnit >= 0 ? txt(r[iUnit]) : '';
+        const isBuyer = merged.has(i) || (!unit && cur);
+        if (isBuyer) { cur && cur.buyers.push({ name, qty, rev }); buyers++; continue; }
+        cur = { nom: name, unit, qty, rev, buyers: [] };
+        S.sales.push(cur);
+      }
+      S.files.sales = f.name;
+      console.log('Продажи:', S.sales.length, 'позиций,', buyers, 'строк покупателей | шапка в строке', hdr+1,
+                  '| колонки', {iName,iUnit,iQty,iRev}, '| объединённых строк', merged.size);
+      if (!S.sales.length) { setState('s-sales','err','⚠ не прочитано ни одной позиции'); return; }
+      document.getElementById('d-sales').classList.add('ok');
+      setState('s-sales','ok', `${f.name}<br>${S.sales.length} позиций · ${buyers} строк покупателей`);
+      afterLoad();
+    } catch (err) {
+      console.error('loadSales:', err);
+      setState('s-sales','err','⚠ ошибка разбора: ' + (err.message || err));
+    }
+  }, m => setState('s-sales','err','⚠ ' + m));
+}
+
+function afterLoad() {
+  const ready = Object.keys(S.specs).length > 0;
+  document.getElementById('btn-calc').disabled = !ready;
+  document.getElementById('ready-note').textContent =
+    ready ? (S.sales.length ? '' : 'нет продаж — посчитаем по спецификациям') : 'нужны спецификации';
+  if (ready && S.calc.length) runCalc();   // не оставляем на экране прежние цифры
+  renderMatch(); renderPrices();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ПОИСК СПЕЦИФИКАЦИИ
+   ═══════════════════════════════════════════════════════════ */
+function buildIndex() {
+  S.specIndex = {};
+  for (const k of Object.keys(S.specs)) S.specIndex[k] = k;
+}
+function findSpec(name) {
+  const k = norm(name);
+  if (!S.specIndex) buildIndex();
+  if (S.aliases[k] && S.specs[S.aliases[k]]) return S.aliases[k];
+  return S.specIndex[k] || null;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ВЫХОД ПАРТИИ ПОЛУФАБРИКАТА
+   Рецептура смеси записана на партию: «103 кг креатина», а в
+   изделие идёт 0,3 кг. Значит стоимость партии надо разделить на
+   её выход. Для сыпучих и жидких смесей выход равен сумме
+   заложенного сырья — закон сохранения массы. Для наборов из
+   штучных деталей (банка, крышка, этикетка) делить нельзя:
+   там выход равен единице.
+   ═══════════════════════════════════════════════════════════ */
+const MASS_UNITS = ['кг','г','гр','л','мл','т'];
+function batchYield(key, v) {
+  if (S.yield[key] > 0) return { q: S.yield[key], unit: norm(v.comps[0] && v.comps[0].unit), src: 'задан вручную' };
+  const units = [...new Set(v.comps.map(c => norm(c.unit)).filter(Boolean))];
+  const u = units.length === 1 ? units[0] : '';
+  if (u && MASS_UNITS.includes(u)) {
+    const q = v.comps.reduce((a, c) => a + c.qty, 0);
+    if (q > 0) return { q, unit: u, src: 'по сумме сырья' };
+  }
+  return { q: 1, unit: u, src: 'штучный' };
+}
+
+/* Похожесть по общим буквенным парам — для подсказок сопоставления */
+function bigrams(s) {
+  const t = s.replace(/[^a-zа-я0-9]+/gi, ' ').trim();
+  const out = new Set();
+  for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i+2));
+  return out;
+}
+function similarity(a, b) {
+  const A = bigrams(a), B = bigrams(b);
+  if (!A.size || !B.size) return 0;
+  let hit = 0;
+  A.forEach(x => { if (B.has(x)) hit++; });
+  return 2 * hit / (A.size + B.size);
+}
+function suggest(name, limit) {
+  const n = norm(name);
+  const out = [];
+  for (const k of Object.keys(S.specs)) {
+    const s = similarity(n, k);
+    if (s > 0.35) out.push({ key: k, nom: S.specs[k].nom, score: s });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out.slice(0, limit || 3);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЦЕНА СЫРЬЯ
+   ═══════════════════════════════════════════════════════════ */
+function getPrice(name) {
+  const k = norm(name);
+  if (S.manual[k] > 0)   return { price: S.manual[k],   src: 'своя' };
+  if (S.purchase[k] > 0) return { price: S.purchase[k], src: 'закупки' };
+  return { price: 0, src: null };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   РАСЧЁТ СЕБЕСТОИМОСТИ
+   Рекурсия с защитой от циклов и ограничением глубины.
+   Готовые результаты запоминаются: у одного полуфабриката
+   бывает десяток родителей, второй раз считать его незачем.
+   ═══════════════════════════════════════════════════════════ */
+let _memo = {};
+function calcCost(name, depth, path) {
+  const key = norm(name);
+  if (_memo[key] && depth < MAXDEPTH) return _memo[key];
+
+  const res = { cost: 0, full: true, missing: [], tree: [], kind: 'сырьё' };
+  if (path.has(key)) { res.full = false; res.missing.push('ЗАЦИКЛЕНО: ' + name); return res; }
+  if (depth > MAXDEPTH) { res.full = false; res.missing.push('ГЛУБЖЕ ' + MAXDEPTH + ' УРОВНЕЙ: ' + name); return res; }
+
+  const sk = findSpec(name);
+  if (!sk) {                                  // лист — берём цену
+    const p = getPrice(name);
+    res.cost = p.price; res.src = p.src;
+    if (!p.price) { res.full = false; res.missing.push(name); }
+    return res;
+  }
+
+  const sp = S.specs[sk];
+  const vi = Math.min(S.pick[sk] || 0, sp.variants.length - 1);
+  const v = sp.variants[vi];
+  res.kind = depth === 0 ? 'изделие' : 'полуфабрикат';
+  res.variants = sp.variants.length; res.vi = vi; res.vkind = v.kind;
+  if (!v.comps.length) {
+    res.full = false; res.missing.push('ПУСТАЯ СПЕЦИФИКАЦИЯ: ' + sp.nom);
+    return res;
+  }
+  const next = new Set(path); next.add(key);
+  const y = depth > 0 ? batchYield(sk, v) : { q: 1, unit: '', src: 'изделие' };
+  res.batch = y;
+  for (const c of v.comps) {
+    const sub = calcCost(c.name, depth + 1, next);
+    const line = sub.cost * c.qty;
+    res.cost += line;
+    if (!sub.full) { res.full = false; res.missing.push(...sub.missing); }
+    res.tree.push({
+      name: c.name, unit: c.unit || S.units[norm(c.name)] || '', qty: c.qty,
+      price: sub.cost, line, depth, src: sub.src, kind: sub.kind,
+      batch: sub.batch, perUnit: sub.perUnit,
+      // единица потребления не совпала с единицей выхода партии — масштаб под вопросом
+      unitWarn: !!(sub.perUnit && norm(c.unit) && norm(c.unit) !== sub.perUnit),
+      full: sub.full, children: sub.tree
+    });
+  }
+  res.missing = [...new Set(res.missing)];
+  if (y.q !== 1) { res.cost /= y.q; res.perUnit = y.unit; }   // стоимость единицы выхода
+  res.missing = [...new Set(res.missing)];
+  if (depth > 0) _memo[key] = res;
+  return res;
+}
+
+function runCalc() {
+  if (!Object.keys(S.specs).length) { toast('Сначала загрузите спецификации'); return; }
+  const t0 = performance.now();
+  _memo = {}; buildIndex();
+  const rows = [];
+
+  // 1. позиции из продаж
+  S.sales.forEach(s => {
+    const k = norm(s.nom);
+    const service = !!S.services[k];
+    const sk = findSpec(s.nom);
+    const r = {
+      nom: s.nom, key: k, unit: s.unit, qty: s.qty, rev: s.rev,
+      buyers: s.buyers, sold: true, service, specKey: sk
+    };
+    if (service) { r.status = 'не производится'; }
+    else if (!sk) { r.status = 'нет спецификации'; }
+    else {
+      const c = calcCost(s.nom, 0, new Set());
+      r.cost = c.cost; r.total = c.cost * s.qty; r.missing = c.missing;
+      r.variants = c.variants; r.vkind = c.vkind; r.vi = c.vi;
+      r.status = c.full ? 'полный' : 'неполный';
+    }
+    if (r.total != null) { r.margin = s.rev - r.total; r.mp = s.rev ? r.margin / s.rev * 100 : 0; }
+    rows.push(r);
+  });
+
+  // 2. изделия из спецификаций, которых не было в продажах
+  const sold = new Set(rows.map(r => r.specKey).filter(Boolean));
+  const used = new Set();
+  Object.values(S.specs).forEach(sp => sp.variants.forEach(v => v.comps.forEach(c => used.add(norm(c.name)))));
+  Object.keys(S.specs).forEach(k => {
+    if (sold.has(k) || used.has(k)) return;     // продано или это полуфабрикат
+    const c = calcCost(S.specs[k].nom, 0, new Set());
+    rows.push({
+      nom: S.specs[k].nom, key: k, specKey: k, qty: 0, rev: 0, sold: false, buyers: [],
+      cost: c.cost, total: 0, missing: c.missing, variants: c.variants, vkind: c.vkind, vi: c.vi,
+      status: c.full ? 'полный' : 'неполный'
+    });
+  });
+
+  S.calc = rows;
+  console.log('Расчёт:', Math.round(performance.now()-t0)+' мс |', rows.length, 'строк |',
+              rows.filter(r => r.status === 'полный').length, 'полных');
+  renderCalc(); renderMetrics(); renderTreePicker(); renderBuyers(); renderReport(); renderPrices(); renderMatch();
+  toast('Рассчитано за ' + Math.round(performance.now()-t0) + ' мс');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   СЫРЬЁ: сводим все листья дерева
+   ═══════════════════════════════════════════════════════════ */
+function materials() {
+  const map = {};
+  Object.entries(S.specs).forEach(([sk, sp]) => {
+    const v = sp.variants[Math.min(S.pick[sk] || 0, sp.variants.length - 1)];
+    v.comps.forEach(c => {
+      const k = norm(c.name);
+      if (S.specs[k]) return;                    // это полуфабрикат, не сырьё
+      (map[k] || (map[k] = { key: k, name: c.name, unit: c.unit || '', specs: new Set() })).specs.add(norm(sp.nom));
+    });
+  });
+  return Object.values(map).map(m => {
+    const p = getPrice(m.name);
+    return { ...m, count: m.specs.size, price: p.price, src: p.src };
+  }).sort((a, b) => (a.price ? 1 : 0) - (b.price ? 1 : 0) || b.count - a.count);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЭКРАН: СОПОСТАВЛЕНИЕ
+   ═══════════════════════════════════════════════════════════ */
+function renderMatch() {
+  const body = document.getElementById('m-body');
+  if (!S.sales.length) { body.innerHTML = '<tr><td colspan="5" class="empty">Загрузите файл продаж</td></tr>'; return; }
+  const q = norm(document.getElementById('m-search').value);
+  const f = document.getElementById('m-filter').value;
+
+  const list = S.sales.filter(s => {
+    const k = norm(s.nom);
+    const linked = !!S.aliases[k], service = !!S.services[k];
+    const found = !!findSpec(s.nom);
+    if (f === 'open')    return !found && !service;
+    if (f === 'linked')  return linked;
+    if (f === 'service') return service;
+    return true;
+  }).filter(s => !q || norm(s.nom).includes(q));
+
+  const open = S.sales.filter(s => !findSpec(s.nom) && !S.services[norm(s.nom)]).length;
+  document.getElementById('c-match').textContent = open;
+  document.getElementById('c-match').className = 'cnt' + (open ? ' warn' : '');
+  document.getElementById('m-note').textContent =
+    `${S.sales.length} позиций в продажах · ${S.sales.filter(s=>findSpec(s.nom)).length} со спецификацией · ${open} без`;
+
+  if (!list.length) { body.innerHTML = '<tr><td colspan="5" class="empty">Ничего не найдено — здесь пусто, и это хорошо</td></tr>'; return; }
+
+  body.innerHTML = list.map(s => {
+    const k = norm(s.nom);
+    const sk = findSpec(s.nom);
+    const service = !!S.services[k];
+    const linked = !!S.aliases[k];
+    let cell;
+    if (service) {
+      cell = '<span class="tag b">не производится</span>';
+    } else if (sk) {
+      cell = `<div>${S.specs[sk].nom}</div><div class="dim2" style="font-size:10.5px;margin-top:2px">${linked ? 'связано вручную' : 'совпало по названию'}</div>`;
+    } else {
+      const sg = suggest(s.nom, 3);
+      cell = sg.length
+        ? `<div class="sugg">${sg.map(x =>
+            `<button onclick="link('${esc(k)}','${esc(x.key)}')"><span class="pct">${Math.round(x.score*100)}%</span>${x.nom}</button>`).join('')}</div>`
+        : '<span class="dim2">похожих спецификаций не нашлось</span>';
+    }
+    return `<tr>
+      <td>${s.nom}</td>
+      <td>${cell}</td>
+      <td class="r">${fmt(s.qty)}</td>
+      <td class="r">${fmt(s.rev)}</td>
+      <td class="r">${
+        service || linked
+          ? `<button class="btn sm ghost" onclick="unlink('${esc(k)}')">сбросить</button>`
+          : (sk ? '' : `<button class="btn sm ghost" onclick="markService('${esc(k)}')">не производим</button>`)
+      }</td>
+    </tr>`;
+  }).join('');
+}
+const esc = s => String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+function link(saleKey, specKey) {
+  S.aliases[saleKey] = specKey; delete S.services[saleKey];
+  saveUser(); runCalc(); toast('Связали');
+}
+function markService(saleKey) {
+  S.services[saleKey] = true; delete S.aliases[saleKey];
+  saveUser(); runCalc(); toast('Отмечено как непроизводимое');
+}
+function unlink(saleKey) {
+  delete S.aliases[saleKey]; delete S.services[saleKey];
+  saveUser(); runCalc();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЭКРАН: ЦЕНЫ
+   ═══════════════════════════════════════════════════════════ */
+function renderPrices() {
+  const body = document.getElementById('pr-body');
+  const all = materials();
+  const none = all.filter(m => !m.price).length;
+  document.getElementById('c-prices').textContent = none;
+  document.getElementById('c-prices').className = 'cnt' + (none ? ' warn' : '');
+  if (!all.length) { body.innerHTML = '<tr><td colspan="6" class="empty">Загрузите спецификации</td></tr>'; return; }
+
+  const q = norm(document.getElementById('pr-search').value);
+  const f = document.getElementById('pr-filter').value;
+  const list = all.filter(m => f === 'none' ? !m.price : f === 'manual' ? S.manual[m.key] > 0 : true)
+                  .filter(m => !q || m.key.includes(q));
+  document.getElementById('pr-note').textContent = `${all.length} наименований сырья · ${none} без цены`;
+
+  body.innerHTML = list.length ? list.map(m => `<tr>
+      <td>${m.name}</td>
+      <td class="dim">${m.unit || '—'}</td>
+      <td class="r dim">${m.count}</td>
+      <td class="r ${S.purchase[m.key] ? '' : 'dim2'}">${S.purchase[m.key] ? fmt2(S.purchase[m.key]) : '—'}</td>
+      <td class="r"><input class="cell" value="${S.manual[m.key] || ''}" placeholder="—"
+           onchange="setManual('${esc(m.key)}', this.value)"></td>
+      <td>${m.src ? `<span class="tag ${m.src === 'закупки' ? 'g' : 'b'}">${m.src}</span>` : '<span class="tag a">нет цены</span>'}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="6" class="empty">Ничего не найдено</td></tr>';
+}
+function setManual(key, v) {
+  const n = num(v);
+  if (n && n > 0) S.manual[key] = n; else delete S.manual[key];
+  saveUser(); runCalc();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЭКРАН: КАЛЬКУЛЯЦИЯ
+   ═══════════════════════════════════════════════════════════ */
+function renderMetrics() {
+  const sold = S.calc.filter(r => r.sold && !r.service);
+  const rev = sold.reduce((a, r) => a + (r.rev || 0), 0);
+  const cost = sold.reduce((a, r) => a + (r.total || 0), 0);
+  const marg = rev - cost;
+  const bad = sold.filter(r => r.status !== 'полный').length;
+  document.getElementById('calc-mets').innerHTML = `
+    <div class="met"><div class="l">Выручка</div><div class="v">${fmtM(rev)}</div><div class="s">${sold.length} позиций</div></div>
+    <div class="met"><div class="l">Себестоимость</div><div class="v">${fmtM(cost)}</div><div class="s">${rev ? (cost/rev*100).toFixed(1) : 0}% от выручки</div></div>
+    <div class="met"><div class="l">Маржа</div><div class="v ${marg>=0?'g':'r'}">${fmtM(marg)}</div><div class="s">${rev ? (marg/rev*100).toFixed(1) : 0}%</div></div>
+    <div class="met"><div class="l">Неполных</div><div class="v ${bad?'a':''}">${bad}</div><div class="s">из ${sold.length} проданных</div></div>`;
+}
+function renderCalc() {
+  const body = document.getElementById('c-body');
+  if (!S.calc.length) { body.innerHTML = '<tr><td colspan="9" class="empty">Нажмите «Рассчитать»</td></tr>'; return; }
+  const q = norm(document.getElementById('c-search').value);
+  const f = document.getElementById('c-filter').value;
+  const list = S.calc.filter(r => {
+    if (f === 'sold') return r.sold;
+    if (f === 'bad')  return r.sold && (r.status === 'неполный' || r.status === 'нет спецификации');
+    if (f === 'loss') return r.sold && r.margin != null && r.margin < 0;
+    return true;
+  }).filter(r => !q || r.key.includes(q))
+    .sort((a, b) => (b.rev || 0) - (a.rev || 0));
+  document.getElementById('c-note').textContent = `показано ${list.length} из ${S.calc.length}`;
+
+  body.innerHTML = list.length ? list.map(r => {
+    const tag = r.status === 'полный' ? 'g' : r.status === 'не производится' ? 'b' : r.status === 'неполный' ? 'a' : 'r';
+    const miss = r.missing && r.missing.length ? ` title="Не хватает: ${r.missing.slice(0,8).join('; ')}"` : '';
+    return `<tr>
+      <td>${r.nom}${r.sold ? '' : ' <span class="tag">не продавалось</span>'}${
+        r.variants > 1 ? ` <span class="tag a" title="У позиции ${r.variants} вариантов спецификации. Считается: ${r.vkind}">вариант ${(r.vi||0)+1}/${r.variants}</span>` : ''}</td>
+      <td class="r dim">${r.qty ? fmt(r.qty) : '—'}</td>
+      <td class="r">${r.rev ? fmt(r.rev) : '—'}</td>
+      <td class="r">${r.cost != null ? fmt2(r.cost) : '—'}</td>
+      <td class="r">${r.total ? fmt(r.total) : '—'}</td>
+      <td class="r ${r.margin >= 0 ? 'g' : 'rd'}">${r.margin != null && r.rev ? fmt(r.margin) : '—'}</td>
+      <td class="r ${r.mp >= 0 ? 'g' : 'rd'}">${r.mp != null && r.rev ? r.mp.toFixed(1) + '%' : '—'}</td>
+      <td><span class="tag ${tag}"${miss}>${r.status}${r.missing && r.missing.length ? ' · ' + r.missing.length : ''}</span></td>
+      <td class="r">${r.specKey ? `<button class="btn sm ghost" onclick="showTree('${esc(r.specKey)}')">по баночке</button>` : ''}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="9" class="empty">Ничего не найдено</td></tr>';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЭКРАН: ДЕРЕВО
+   ═══════════════════════════════════════════════════════════ */
+function pickVariant(key, i) {
+  S.pick[key] = +i; saveUser(); runCalc(); renderTree();
+  toast('Вариант рецептуры сохранён');
+}
+function renderTreePicker() {
+  const sel = document.getElementById('t-pick');
+  const keys = Object.keys(S.specs).sort((a, b) => S.specs[a].nom.localeCompare(S.specs[b].nom, 'ru'));
+  sel.innerHTML = keys.map(k => `<option value="${k.replace(/"/g,'&quot;')}">${S.specs[k].nom}</option>`).join('');
+  renderTree();
+}
+function showTree(key) {
+  document.getElementById('t-pick').value = key;
+  nav('tree'); renderTree();
+}
+function renderTree() {
+  const body = document.getElementById('t-body');
+  const key = document.getElementById('t-pick').value;
+  if (!key || !S.specs[key]) { body.innerHTML = '<tr><td colspan="7" class="empty">Выберите изделие</td></tr>'; return; }
+  _memo = {};
+  const sp = S.specs[key];
+  const res = calcCost(sp.nom, 0, new Set());
+  const vsel = sp.variants.length > 1
+    ? `<span style="margin-left:.8rem">вариант рецептуры:
+        <select class="sel" onchange="pickVariant('${esc(key)}', this.value)">
+          ${sp.variants.map((v, i) => `<option value="${i}" ${i === (res.vi||0) ? 'selected' : ''}>${i+1}. ${v.kind} — ${v.comps.length} компонентов</option>`).join('')}
+        </select></span>`
+    : '';
+  // связываем с продажами: сколько этой позиции продано и сколько она съела всего
+  const sale = S.calc.find(r => r.specKey === key && r.sold);
+  document.getElementById('t-note').innerHTML =
+    `себестоимость одной единицы <b class="mono">${fmt2(res.cost)} ₽</b> · `
+    + (res.full ? '<span class="g">расчёт полный</span>' : `<span class="am">не хватает ${res.missing.length} цен</span>`)
+    + (sale && sale.qty ? ` · продано <b class="mono">${fmt(sale.qty)}</b> ${sale.unit || 'шт'}`
+        + ` · себестоимость всего <b class="mono">${fmt(res.cost * sale.qty)} ₽</b>`
+        + ` · выручка <b class="mono">${fmt(sale.rev)} ₽</b>`
+        + ` · маржа <b class="mono ${sale.rev - res.cost*sale.qty >= 0 ? 'g' : 'rd'}">${fmt(sale.rev - res.cost*sale.qty)} ₽</b>`
+        + ` (${sale.rev ? ((sale.rev - res.cost*sale.qty)/sale.rev*100).toFixed(1) : 0}%)` : '')
+    + vsel;
+
+  const out = [];
+  (function walk(nodes, level) {
+    nodes.forEach(n => {
+      const pipe = level ? '│  '.repeat(level - 1) + '├─ ' : '';
+      const share = res.cost ? n.line / res.cost * 100 : 0;
+      out.push(`<tr>
+        <td><div class="node"><span class="pipe">${pipe}</span>
+          <span>${n.name}</span>
+          ${n.kind === 'полуфабрикат' ? `<span class="kind" title="Выход партии: ${n.batch ? n.batch.q + ' ' + (n.batch.unit||'') + ' (' + n.batch.src + ')' : '—'}">п/ф</span>` : ''}
+          ${n.unitWarn ? `<span class="tag r" title="В изделие заложено ${n.qty} ${n.unit}, а выход рецептуры считается в «${n.perUnit}». Проверьте единицы.">единицы не сходятся</span>` : ''}
+          ${!n.full && n.kind !== 'полуфабрикат' ? '<span class="tag a">нет цены</span>' : ''}
+        </div></td>
+        <td class="dim">${n.unit || '—'}</td>
+        <td class="r">${n.qty}</td>
+        <td class="r">${n.price ? fmt2(n.price) : '—'}</td>
+        <td class="r">${n.line ? fmt2(n.line) : '—'}</td>
+        <td class="r dim">${share ? share.toFixed(1) + '%' : '—'}<div class="bar"><i style="width:${Math.min(share,100)}%"></i></div></td>
+        <td>${n.src ? `<span class="tag ${n.src === 'закупки' ? 'g' : 'b'}">${n.src}</span>` : (n.kind === 'полуфабрикат' ? '<span class="tag">рецептура</span>' : '')}</td>
+      </tr>`);
+      if (n.children && n.children.length) walk(n.children, level + 1);
+    });
+  })(res.tree, 1);
+  const sale2 = S.calc.find(r => r.specKey === key && r.sold);
+  out.push(`<tr style="background:var(--bg3)">
+      <td colspan="4"><b>Итого на одну единицу</b></td>
+      <td class="r"><b class="mono">${fmt2(res.cost)}</b></td>
+      <td class="r dim">100%</td><td></td></tr>`);
+  if (sale2 && sale2.qty) out.push(`<tr style="background:var(--bg3)">
+      <td colspan="4"><b>Итого на ${fmt(sale2.qty)} ${sale2.unit || 'шт'} — весь проданный объём</b></td>
+      <td class="r"><b class="mono">${fmt(res.cost * sale2.qty)}</b></td>
+      <td class="r dim">при выручке ${fmt(sale2.rev)}</td><td></td></tr>`);
+  body.innerHTML = out.join('');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЭКРАН: ПОКУПАТЕЛИ
+   ═══════════════════════════════════════════════════════════ */
+function buyerRows() {
+  const rows = [];
+  S.calc.forEach(r => {
+    if (!r.sold || !r.buyers || !r.buyers.length) return;
+    r.buyers.forEach(b => {
+      const cost = r.cost != null ? r.cost * b.qty : null;
+      rows.push({ buyer: b.name, nom: r.nom, qty: b.qty, rev: b.rev, cost,
+                  margin: cost != null ? b.rev - cost : null,
+                  mp: cost != null && b.rev ? (b.rev - cost) / b.rev * 100 : null });
+    });
+  });
+  return rows;
+}
+function renderBuyers() {
+  const det = buyerRows();
+  const body = document.getElementById('b-body');
+  if (!det.length) { body.innerHTML = '<tr><td colspan="8" class="empty">В продажах нет разбивки по покупателям</td></tr>';
+                     document.getElementById('bd-body').innerHTML = ''; document.getElementById('b-mets').innerHTML = ''; return; }
+  const by = {};
+  det.forEach(d => {
+    const b = by[d.buyer] || (by[d.buyer] = { n:0, qty:0, rev:0, cost:0, known:0 });
+    b.n++; b.qty += d.qty; b.rev += d.rev;
+    if (d.cost != null) { b.cost += d.cost; b.known++; }
+  });
+  const list = Object.entries(by).map(([k, v]) => ({ buyer:k, ...v, margin: v.rev - v.cost,
+                mp: v.rev ? (v.rev - v.cost) / v.rev * 100 : 0 })).sort((a,b) => b.rev - a.rev);
+  const totRev = list.reduce((a,b) => a + b.rev, 0);
+  const totCost = list.reduce((a,b) => a + b.cost, 0);
+  document.getElementById('b-mets').innerHTML = `
+    <div class="met"><div class="l">Покупателей</div><div class="v">${list.length}</div><div class="s">${det.length} строк</div></div>
+    <div class="met"><div class="l">Выручка</div><div class="v">${fmtM(totRev)}</div></div>
+    <div class="met"><div class="l">Себестоимость</div><div class="v">${fmtM(totCost)}</div><div class="s">${totRev?(totCost/totRev*100).toFixed(1):0}%</div></div>
+    <div class="met"><div class="l">Маржа</div><div class="v ${totRev-totCost>=0?'g':'r'}">${fmtM(totRev-totCost)}</div><div class="s">${totRev?((totRev-totCost)/totRev*100).toFixed(1):0}%</div></div>`;
+
+  body.innerHTML = list.map(b => `<tr>
+      <td>${b.buyer}${b.known < b.n ? ` <span class="tag a" title="У ${b.n-b.known} позиций нет себестоимости">неполно</span>` : ''}</td>
+      <td class="r dim">${b.n}</td><td class="r">${fmt(b.qty)}</td><td class="r">${fmt(b.rev)}</td>
+      <td class="r">${fmt(b.cost)}</td>
+      <td class="r ${b.margin>=0?'g':'rd'}">${fmt(b.margin)}</td>
+      <td class="r ${b.mp>=0?'g':'rd'}">${b.mp.toFixed(1)}%</td>
+      <td class="r dim">${totRev ? (b.rev/totRev*100).toFixed(1) : 0}%</td>
+    </tr>`).join('');
+  document.getElementById('bd-body').innerHTML = det.sort((a,b) => b.rev - a.rev).map(d => `<tr>
+      <td class="dim">${d.buyer}</td><td>${d.nom}</td>
+      <td class="r">${fmt(d.qty)}</td><td class="r">${fmt(d.rev)}</td>
+      <td class="r">${d.cost != null ? fmt(d.cost) : '—'}</td>
+      <td class="r ${d.mp>=0?'g':'rd'}">${d.mp != null ? d.mp.toFixed(1)+'%' : '—'}</td>
+    </tr>`).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ЭКРАН: ОТЧЁТ
+   ═══════════════════════════════════════════════════════════ */
+function renderReport() {
+  const sold = S.calc.filter(r => r.sold && !r.service);
+  const noSpec = sold.filter(r => r.status === 'нет спецификации');
+  const partial = sold.filter(r => r.status === 'неполный');
+  const loss = sold.filter(r => r.margin != null && r.margin < 0 && r.rev);
+  const noPrice = materials().filter(m => !m.price);
+  const services = S.calc.filter(r => r.service);
+  const multiSpec = S.calc.filter(r => r.variants > 1).sort((a,b) => b.variants - a.variants);
+
+  const tbl = (rows, cols) => rows.length
+    ? `<div class="tw" style="max-height:40vh"><table><thead><tr>${cols.map(c => `<th${c[2]||''}>${c[0]}</th>`).join('')}</tr></thead>
+       <tbody>${rows.map(r => `<tr>${cols.map(c => `<td${c[2]||''}>${c[1](r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty" style="padding:1.2rem">пусто</div>';
+
+  document.getElementById('rep-body').innerHTML = `
+    <div class="card">
+      <h2>Убыточные позиции <span class="tag ${loss.length?'r':'g'}">${loss.length}</span></h2>
+      <p class="sub">Себестоимость сырья выше выручки. Проверьте цену продажи и норму расхода.</p>
+      <div style="margin-top:.7rem">${tbl(loss.sort((a,b)=>a.margin-b.margin), [
+        ['Позиция', r => r.nom],
+        ['Выручка', r => fmt(r.rev), ' class="r"'],
+        ['Себестоимость', r => fmt(r.total), ' class="r"'],
+        ['Маржа', r => `<span class="rd">${fmt(r.margin)}</span>`, ' class="r"']])}</div>
+    </div>
+
+    <div class="card">
+      <h2>Неполная себестоимость <span class="tag ${partial.length?'a':'g'}">${partial.length}</span></h2>
+      <p class="sub">Часть сырья без цены — итог занижен, маржа завышена. Число в скобках показывает, скольких цен не хватает.</p>
+      <div style="margin-top:.7rem">${tbl(partial.sort((a,b)=>b.rev-a.rev), [
+        ['Позиция', r => r.nom],
+        ['Не хватает', r => `<span class="dim">${r.missing.slice(0,3).join(', ')}${r.missing.length>3?' и ещё '+(r.missing.length-3):''}</span>`],
+        ['Выручка', r => fmt(r.rev), ' class="r"']])}</div>
+    </div>
+
+    <div class="card">
+      <h2>Сырьё без цены <span class="tag ${noPrice.length?'a':'g'}">${noPrice.length}</span></h2>
+      <p class="sub">Отсортировано по числу спецификаций: сверху то, что заблокировало больше всего расчётов.</p>
+      <div style="margin-top:.7rem">${tbl(noPrice.slice(0, 60), [
+        ['Сырьё', m => m.name],
+        ['Ед.', m => `<span class="dim">${m.unit||'—'}</span>`],
+        ['В скольких спецификациях', m => m.count, ' class="r"']])}</div>
+    </div>
+
+    <div class="card">
+      <h2>Продажи без спецификации <span class="tag ${noSpec.length?'r':'g'}">${noSpec.length}</span></h2>
+      <p class="sub">Либо позиция названа иначе — свяжите её на вкладке «Сопоставление», либо это не ваше производство — отметьте как непроизводимое.</p>
+      <div style="margin-top:.7rem">${tbl(noSpec.sort((a,b)=>b.rev-a.rev), [
+        ['Позиция', r => r.nom],
+        ['Выручка', r => fmt(r.rev), ' class="r"'],
+        ['', r => `<button class="btn sm ghost" onclick="nav('match')">сопоставить</button>`, ' class="r"']])}</div>
+    </div>
+
+    ${multiSpec.length ? `<div class="card">
+      <h2>Несколько вариантов рецептуры <span class="tag a">${multiSpec.length}</span></h2>
+      <p class="sub">У этих позиций в 1С заведено больше одной спецификации — разные вкусы, фасовки или редакции. Складывать их нельзя, поэтому считается один вариант. Проверьте, что выбран правильный: он подписан в колонке справа, сменить можно на вкладке «Состав изделия».</p>
+      <div style="margin-top:.7rem">${tbl(multiSpec.slice(0,60), [
+        ['Позиция', r => r.nom],
+        ['Вариантов', r => r.variants, ' class="r"'],
+        ['Считается', r => `<span class="dim">${r.vkind || '—'}</span>`],
+        ['', r => `<button class="btn sm ghost" onclick="showTree('${esc(r.specKey)}')">выбрать</button>`, ' class="r"']])}</div>
+    </div>` : ''}
+
+    ${services.length ? `<div class="card">
+      <h2>Не производится <span class="tag b">${services.length}</span></h2>
+      <p class="sub">Услуги и прочие позиции, для которых себестоимость по спецификации не считается. Их выручка не учитывается в маржинальности производства.</p>
+      <div style="margin-top:.7rem">${tbl(services, [
+        ['Позиция', r => r.nom],
+        ['Выручка', r => fmt(r.rev), ' class="r"'],
+        ['', r => `<button class="btn sm ghost" onclick="unlink('${esc(r.key)}')">вернуть в расчёт</button>`, ' class="r"']])}</div>
+    </div>` : ''}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ВЫГРУЗКИ
+   ═══════════════════════════════════════════════════════════ */
+function saveBook(sheets, fname) {
+  const wb = XLSX.utils.book_new();
+  sheets.forEach(([name, data]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), name));
+  XLSX.writeFile(wb, fname);
+}
+function exportCalc() {
+  if (!S.calc.length) { toast('Сначала рассчитайте'); return; }
+  saveBook([['Калькуляция', S.calc.map(r => ({
+    'Позиция': r.nom, 'Кол-во': r.qty || '', 'Выручка': r.rev || '',
+    'Себестоимость за ед.': r.cost != null ? +r.cost.toFixed(2) : '',
+    'Себестоимость итого': r.total || '', 'Маржа': r.rev ? r.margin : '',
+    'Маржа, %': r.rev && r.mp != null ? +r.mp.toFixed(1) : '',
+    'Статус': r.status, 'Не хватает': (r.missing || []).join('; ')
+  }))]], 'Калькуляция.xlsx');
+}
+function exportPrices() {
+  const list = materials();
+  saveBook([['Цены сырья', list.map(m => ({
+    'Номенклатура': m.name, 'Ед. изм.': m.unit, 'Цена': m.price || '',
+    'В скольких спецификациях': m.count, 'Источник': m.src || 'нет цены'
+  }))]], 'Цены сырья.xlsx');
+  toast('Заполните колонку «Цена» и загрузите файл обратно');
+}
+function importPrices(inp) {
+  const f = inp.files[0]; if (!f) return;
+  readXlsx(f, rows => {
+    try {
+      const hdr = findHeader(rows, ['номенклат'], 10);
+      if (hdr < 0) { toast('Не нашли колонку «Номенклатура»'); return; }
+      const H = headerAt(rows, hdr);
+      const iName = colOf(H, 'номенклат'), iPrice = colOf(H, 'цена');
+      if (iPrice < 0) { toast('Не нашли колонку «Цена»'); return; }
+      let n = 0;
+      for (let i = hdr + 1; i < rows.length; i++) {
+        const r = dense(rows[i]);
+        const name = txt(r[iName]); const p = num(r[iPrice]);
+        if (!name || !p || p <= 0) continue;
+        S.manual[norm(name)] = p; n++;
+      }
+      saveUser(); runCalc(); toast(n + ' цен загружено');
+    } catch (err) { toast('Ошибка: ' + (err.message || err)); }
+  });
+  inp.value = '';
+}
+function exportBuyers() {
+  const det = buyerRows();
+  if (!det.length) { toast('Нет данных по покупателям'); return; }
+  saveBook([['Покупатели', det.map(d => ({
+    'Покупатель': d.buyer, 'Позиция': d.nom, 'Кол-во': d.qty, 'Выручка': d.rev,
+    'Себестоимость': d.cost != null ? +d.cost.toFixed(2) : '',
+    'Маржа': d.margin != null ? +d.margin.toFixed(2) : '',
+    'Маржа, %': d.mp != null ? +d.mp.toFixed(1) : ''
+  }))]], 'Покупатели.xlsx');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   РЕЗЕРВНАЯ КОПИЯ
+   ═══════════════════════════════════════════════════════════ */
+function backupSave() {
+  const data = { v: 1, date: new Date().toISOString(), manual: S.manual, aliases: S.aliases, services: S.services };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = 'norma-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('Копия сохранена');
+}
+function backupLoad(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      const d = JSON.parse(e.target.result);
+      S.manual = d.manual || {}; S.aliases = d.aliases || {}; S.services = d.services || {};
+      saveUser();
+      if (Object.keys(S.specs).length) runCalc(); else { renderPrices(); renderMatch(); }
+      toast('Восстановлено');
+    } catch (err) { toast('Не похоже на файл копии'); }
+  };
+  r.readAsText(f); inp.value = '';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   НАВИГАЦИЯ И СТАРТ
+   ═══════════════════════════════════════════════════════════ */
+function nav(p) {
+  document.querySelectorAll('.page').forEach(x => x.classList.toggle('on', x.id === 'p-' + p));
+  document.querySelectorAll('.nav').forEach(x => x.classList.toggle('on', x.dataset.p === p));
+}
+document.querySelectorAll('.nav').forEach(el => el.onclick = () => nav(el.dataset.p));
+
+['specs','prices','sales'].forEach(k => {
+  const d = document.getElementById('d-' + k);
+  d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', () => d.classList.remove('over'));
+  d.addEventListener('drop', e => {
+    e.preventDefault(); d.classList.remove('over');
+    const inp = document.getElementById('f-' + k);
+    if (e.dataTransfer.files.length) {
+      const dt = new DataTransfer(); dt.items.add(e.dataTransfer.files[0]); inp.files = dt.files;
+      ({ specs: loadSpecs, prices: loadPrices, sales: loadSales })[k](inp);
+    }
+  });
+});
+
+loadUser();
+if (!LS.ok) toast('Браузер не сохраняет данные — цены и связки пропадут после закрытия');
+renderMatch(); renderPrices();
+console.log('%cIRIX NORMA v1.0 — ' + BUILD, 'color:#00E38A;font-weight:bold');
+</script>
+</body>
+</html>
