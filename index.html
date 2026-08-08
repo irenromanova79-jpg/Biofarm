@@ -104,6 +104,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .btn-ghost:hover{border-color:var(--border)}
 /* Inputs */
 input[type=text],input[type=number],input[type=search],.inp{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;padding:.4rem .75rem;font-family:var(--font);width:100%}
+.combo{position:relative}
+.combo-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:340px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.combo-opt{padding:.5rem .75rem;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)}
+.combo-opt:last-child{border-bottom:none}
+.combo-opt:hover,.combo-opt.active{background:var(--green-bg);color:var(--accent)}
+.combo-opt mark{background:transparent;color:var(--accent);font-weight:600}
+.combo-empty{padding:.6rem .75rem;font-size:12px;color:var(--text3)}
 input:focus,.inp:focus{outline:none;border-color:var(--accent)}
 select{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;padding:.4rem .75rem;font-family:var(--font)}
 select:focus{outline:none;border-color:var(--accent)}
@@ -468,9 +475,14 @@ select:focus{outline:none;border-color:var(--accent)}
     <!-- DRILL -->
     <div id="tab-drill" class="section">
       <div class="toolbar">
-        <select id="drill-select" style="flex:1;max-width:500px" onchange="renderDrill()">
-          <option value="">— выберите модель для детализации —</option>
-        </select>
+        <div class="combo" style="flex:1;max-width:500px">
+          <input type="text" id="drill-search" class="inp" autocomplete="off"
+                 placeholder="Начните вводить название модели (можно вставить из буфера)..."
+                 oninput="filterDrillOptions()" onfocus="filterDrillOptions()"
+                 onkeydown="drillSearchKeydown(event)"
+                 onblur="setTimeout(hideDrillDropdown, 150)">
+          <div id="drill-dropdown" class="combo-dropdown" style="display:none"></div>
+        </div>
       </div>
       <div id="drill-content">
         <div class="empty"><span class="empty-icon">⊞</span>Выберите модель</div>
@@ -1492,6 +1504,7 @@ function loadSpecs(inp) {
     }
     S.specsLayout = newLayout ? 'new' : 'old';
     let compWithChar = 0;
+    S.specsDupCount = 0;
 
     // Данные начинаются сразу после шапки. Раньше здесь было зашито i = 7 —
     // сдвиг шапки на строку ломал разбор молча.
@@ -1542,7 +1555,14 @@ function loadSpecs(inp) {
         const char = String(r[iCompChar] || '').trim().replace(/^nan$/i, '');
         const key = norm(nomProd) + '|' + norm(char);
         current = key;
-        if (!S.specs[key]) S.specs[key] = { nom: nomProd, char, components: [] };
+        // Одна и та же номенклатура+характеристика в этом файле иногда встречается
+        // несколько раз — это исторические версии рецептуры под разными названиями
+        // (например «СГР - 08.04.2024» и «СТМ Магний 100мг - 08.04.2024» с одинаковым
+        // составом). Раньше повторный заголовок молча ДОПИСЫВАЛ компоненты во всё тот же
+        // массив — состав задваивался, а себестоимость получалась в разы больше реальной.
+        // Теперь при повторе начинаем состав заново: остаётся последняя по файлу версия.
+        if (S.specs[key]) { S.specsDupCount++; }
+        S.specs[key] = { nom: nomProd, char, components: [] };
       } else {
         // Старая раскладка (без характеристики компонента)
         const c0 = String(r[0] || '').trim();
@@ -1575,7 +1595,8 @@ function loadSpecs(inp) {
     const okCnt = Object.values(S.specs).filter(s => s.components && s.components.length).length;
     setUploaded('uz-specs', 'us-specs', inp.files[0].name,
       okCnt + ' спецификаций · ' + compTotal + ' компонентов'
-      + (compWithChar ? ' · ' + compWithChar + ' с характеристикой' : ''));
+      + (compWithChar ? ' · ' + compWithChar + ' с характеристикой' : '')
+      + (S.specsDupCount ? ' · ' + S.specsDupCount + ' дублей (взята последняя версия)' : ''));
     document.getElementById('uz-stock').style.display = 'block';
     applyUserSpecs();
     specsSave(inp.files[0].name);
@@ -2036,20 +2057,119 @@ function renderCalcTable() {
 }
 
 // ── Drill ────────────────────────────────────────────────────────────────────
+// Раньше здесь был обычный <select> — со списком в сотни моделей поиск по нему
+// неудобен: браузерный переход по первой букве и то, что в поле нельзя ничего
+// вставить (paste игнорируется в <select>). Заменили на текстовое поле с живой
+// фильтрацией по подстроке (через norm(), значит устойчиво к регистру и
+// латинско-кириллическим двойникам) и выпадающим списком совпадений.
+S.drillKey = '';       // выбранный ключ "ном|||характеристика"
+S.drillActiveIdx = -1; // подсвеченный стрелками пункт в открытом списке
+
 function renderDrillSelect() {
-  const sel = document.getElementById('drill-select');
-  sel.innerHTML = '<option value="">— выберите модель для детализации —</option>' +
-    S.calcRows.filter(r => r.hasSpec).map(r => `<option value="${esc(r.nom)}|||${esc(r.char || '')}">${r.nom}${r.char ? ' (' + r.char + ')' : ''}</option>`).join('');
+  // Список опций пересобирается при каждом пересчёте; сам текст в поле поиска
+  // не трогаем, если выбор всё ещё валиден.
+  S.drillOptions = S.calcRows.filter(r => r.hasSpec).map(r => ({
+    key: r.nom + '|||' + (r.char || ''),
+    label: r.nom + (r.char ? ' (' + r.char + ')' : '')
+  }));
+  if (S.drillKey && !S.drillOptions.some(o => o.key === S.drillKey)) {
+    S.drillKey = '';
+    const inp = document.getElementById('drill-search');
+    if (inp) inp.value = '';
+  }
 }
 
 function openDrill(nom, char) {
-  document.getElementById('drill-select').value = nom + '|||' + char;
+  const key = nom + '|||' + (char || '');
+  S.drillKey = key;
+  const opt = (S.drillOptions || []).find(o => o.key === key);
+  const inp = document.getElementById('drill-search');
+  if (inp) inp.value = opt ? opt.label : (nom + (char ? ' (' + char + ')' : ''));
+  hideDrillDropdown();
   renderDrill();
   switchTab('drill');
 }
 
+function filterDrillOptions() {
+  const inp = document.getElementById('drill-search');
+  const dd = document.getElementById('drill-dropdown');
+  if (!inp || !dd) return;
+  const q = norm(inp.value);
+  const opts = S.drillOptions || [];
+  const matches = (q ? opts.filter(o => norm(o.label).includes(q)) : opts).slice(0, 200);
+  S.drillActiveIdx = matches.length ? 0 : -1;
+  renderDrillDropdown(matches, q);
+}
+
+function renderDrillDropdown(matches, q) {
+  const dd = document.getElementById('drill-dropdown');
+  if (!dd) return;
+  if (!matches.length) {
+    dd.innerHTML = '<div class="combo-empty">Ничего не найдено</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map((o, i) => {
+    let label = esc(o.label);
+    // Подсвечиваем найденную подстроку в исходном (не нормализованном) тексте —
+    // ищем позицию через norm(), но вырезаем из оригинала, чтобы не потерять регистр.
+    if (q) {
+      const nl = norm(o.label);
+      const pos = nl.indexOf(q);
+      if (pos >= 0) {
+        const before = esc(o.label.slice(0, pos));
+        const mid = esc(o.label.slice(pos, pos + q.length));
+        const after = esc(o.label.slice(pos + q.length));
+        label = before + '<mark>' + mid + '</mark>' + after;
+      }
+    }
+    return `<div class="combo-opt${i === S.drillActiveIdx ? ' active' : ''}" data-idx="${i}"
+                 onmousedown="event.preventDefault(); pickDrillOption('${esc(o.key)}')">${label}</div>`;
+  }).join('');
+  dd.dataset.keys = JSON.stringify(matches.map(m => m.key));
+  dd.style.display = 'block';
+}
+
+function pickDrillOption(key) {
+  const opt = (S.drillOptions || []).find(o => o.key === key);
+  if (!opt) return;
+  S.drillKey = key;
+  const inp = document.getElementById('drill-search');
+  if (inp) inp.value = opt.label;
+  hideDrillDropdown();
+  renderDrill();
+}
+
+function hideDrillDropdown() {
+  const dd = document.getElementById('drill-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+function drillSearchKeydown(ev) {
+  const dd = document.getElementById('drill-dropdown');
+  if (!dd || dd.style.display === 'none') return;
+  const keys = JSON.parse(dd.dataset.keys || '[]');
+  if (!keys.length) return;
+  if (ev.key === 'ArrowDown') {
+    ev.preventDefault();
+    S.drillActiveIdx = Math.min(S.drillActiveIdx + 1, keys.length - 1);
+    dd.querySelectorAll('.combo-opt').forEach((el, i) => el.classList.toggle('active', i === S.drillActiveIdx));
+    dd.querySelector('.combo-opt.active')?.scrollIntoView({ block: 'nearest' });
+  } else if (ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    S.drillActiveIdx = Math.max(S.drillActiveIdx - 1, 0);
+    dd.querySelectorAll('.combo-opt').forEach((el, i) => el.classList.toggle('active', i === S.drillActiveIdx));
+    dd.querySelector('.combo-opt.active')?.scrollIntoView({ block: 'nearest' });
+  } else if (ev.key === 'Enter') {
+    ev.preventDefault();
+    if (S.drillActiveIdx >= 0) pickDrillOption(keys[S.drillActiveIdx]);
+  } else if (ev.key === 'Escape') {
+    hideDrillDropdown();
+  }
+}
+
 function renderDrill() {
-  const val = document.getElementById('drill-select').value;
+  const val = S.drillKey;
   const el = document.getElementById('drill-content');
   if (!val) { el.innerHTML = '<div class="empty"><span class="empty-icon">⊞</span>Выберите модель</div>'; return; }
   const [nom, char] = val.split('|||');
@@ -2811,8 +2931,8 @@ function printDrillDirect() {
     return;
   }
 
-  const sel = document.getElementById('drill-select');
-  const title = sel?.options[sel.selectedIndex]?.text || 'Детализация';
+  const inp = document.getElementById('drill-search');
+  const title = inp?.value || 'Детализация';
   const orient = 'landscape';
 
   // Ориентация
